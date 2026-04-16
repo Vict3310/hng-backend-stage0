@@ -1,64 +1,63 @@
 const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
-
+const fetch = require('node-fetch');
 const app = express();
-const PORT = process.env.PORT || 10000; // Render prefers 10000
+const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Middleware to handle CORS
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    next();
+});
 
+// GET endpoint at /api/classify
 app.get('/api/classify', async (req, res) => {
-    const { name } = req.query;
+    const name = req.query.name;
 
-    // 1. Validation (400)
-    if (!name || name.trim() === "") {
-        return res.status(400).json({ status: "error", message: "name query parameter is required" });
-    }
-
-    // 2. Validation (422) - Regex to allow only letters
-    if (!/^[a-zA-Z]+$/.test(name)) {
-        return res.status(422).json({ status: "error", message: "name must be a valid string containing only letters" });
+    // Input validation
+    if (!name || typeof name !== 'string') {
+        return res.status(!name ? 400 : 422).json({
+            status: "error",
+            message: !name ? "Missing or empty name" : "Non-string name"
+        });
     }
 
     try {
-        // 3. External API with a 4-second timeout to prevent 502s
-        const response = await axios.get(`https://api.genderize.io?name=${name}`, { timeout: 4000 });
-        
-        const { gender, probability, count } = response.data;
+const response = await fetch(`https://api.genderize.io?name=${name}`);
+const data = await response.json().catch(() => {
+    return { gender: null, count: 0 };
+});
 
-        // 4. Edge Case: No prediction (Nonsense names)
-        if (!gender || count === 0) {
-            return res.status(200).json({ 
-                status: "error", 
-                message: "No prediction available for the provided name" 
+        // Genderize edge cases
+if (data.gender === null || data.count === 0 || !data) {
+            return res.status(500).json({
+                status: "error",
+                message: "No prediction available for the provided name"
             });
         }
 
-        // 5. Confidence Logic
-        const is_confident = (probability >= 0.7 && count >= 100);
-
-        // 6. Success Response
-        return res.status(200).json({
+        // Process the response
+        const processedData = {
             status: "success",
             data: {
                 name: name,
-                gender: gender,
-                probability: probability,
-                sample_size: count,
-                is_confident: is_confident,
+                gender: data.gender,
+                probability: data.probability,
+                sample_size: data.count,
+                is_confident: data.probability >= 0.7 && data.count >= 100,
                 processed_at: new Date().toISOString()
             }
-        });
+        };
 
+        res.json(processedData);
     } catch (error) {
-        // If external API fails, we send a cleaner error
-        return res.status(502).json({ 
-            status: "error", 
-            message: "External service unavailable" 
+        res.status(502).json({
+            status: "error",
+            message: "Failed to fetch data from the external API"
         });
     }
 });
 
+// Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
