@@ -3,29 +3,30 @@ const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render prefers 10000
 
-// Requirement: CORS header must be *
 app.use(cors());
 
 app.get('/api/classify', async (req, res) => {
     const { name } = req.query;
 
-    // 1. Input Validation
-    if (name === undefined || name === "") {
+    // 1. Validation (400)
+    if (!name || name.trim() === "") {
         return res.status(400).json({ status: "error", message: "name query parameter is required" });
     }
-    
-    if (typeof name !== 'string' || !isNaN(name)) {
-        return res.status(422).json({ status: "error", message: "name must be a valid string" });
+
+    // 2. Validation (422) - Regex to allow only letters
+    if (!/^[a-zA-Z]+$/.test(name)) {
+        return res.status(422).json({ status: "error", message: "name must be a valid string containing only letters" });
     }
 
     try {
-        // 2. External API Call
-        const response = await axios.get(`https://api.genderize.io?name=${name}`);
+        // 3. External API with a 4-second timeout to prevent 502s
+        const response = await axios.get(`https://api.genderize.io?name=${name}`, { timeout: 4000 });
+        
         const { gender, probability, count } = response.data;
 
-        // 3. Genderize Edge Case: No prediction
+        // 4. Edge Case: No prediction (Nonsense names)
         if (!gender || count === 0) {
             return res.status(200).json({ 
                 status: "error", 
@@ -33,26 +34,28 @@ app.get('/api/classify', async (req, res) => {
             });
         }
 
-        // 4. Confidence Logic
-        // probability >= 0.7 AND sample_size >= 100
+        // 5. Confidence Logic
         const is_confident = (probability >= 0.7 && count >= 100);
 
-        // 5. Success Response
+        // 6. Success Response
         return res.status(200).json({
             status: "success",
             data: {
                 name: name,
                 gender: gender,
                 probability: probability,
-                sample_size: count, // Renamed count to sample_size
+                sample_size: count,
                 is_confident: is_confident,
-                processed_at: new Date().toISOString() // ISO 8601 UTC
+                processed_at: new Date().toISOString()
             }
         });
 
     } catch (error) {
-        // 6. Error Handling
-        return res.status(502).json({ status: "error", message: "External API error" });
+        // If external API fails, we send a cleaner error
+        return res.status(502).json({ 
+            status: "error", 
+            message: "External service unavailable" 
+        });
     }
 });
 
