@@ -22,13 +22,13 @@ app.get('/api/classify', async (req, res) => {
     }
 
     try {
-const response = await fetch(`https://api.genderize.io?name=${name}`);
-const data = await response.json().catch(() => {
-    return { gender: null, count: 0 };
-});
+        const response = await fetch(`https://api.genderize.io?name=${name}`);
+        const data = await response.json().catch(() => {
+            return { gender: null, count: 0 };
+        });
 
         // Genderize edge cases
-if (data.gender === null || data.count === 0 || !data) {
+        if (data.gender === null || data.count === 0 || !data || response.status === 502) {
             return res.status(500).json({
                 status: "error",
                 message: "No prediction available for the provided name"
