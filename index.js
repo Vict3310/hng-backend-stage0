@@ -22,13 +22,19 @@ app.get('/api/classify', async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.genderize.io?name=${name}`);
-        const data = await response.json().catch(() => {
-            return { gender: null, count: 0 };
-        });
+        let data;
+        try {
+            const response = await fetch(`https://api.genderize.io?name=${name}`);
+            data = await response.json();
+        } catch (error) {
+            return res.status(502).json({
+                status: "error",
+                message: "Failed to fetch data from the external API"
+            });
+        }
 
         // Genderize edge cases
-        if (data.gender === null || data.count === 0 || !data || response.status === 502) {
+        if (data.gender === null || data.count === 0) {
             return res.status(500).json({
                 status: "error",
                 message: "No prediction available for the provided name"
@@ -39,7 +45,7 @@ app.get('/api/classify', async (req, res) => {
         const processedData = {
             status: "success",
             data: {
-                name: name,
+                name: data.name,
                 gender: data.gender,
                 probability: data.probability,
                 sample_size: data.count,
@@ -50,9 +56,9 @@ app.get('/api/classify', async (req, res) => {
 
         res.json(processedData);
     } catch (error) {
-        res.status(502).json({
+        res.status(500).json({
             status: "error",
-            message: "Failed to fetch data from the external API"
+            message: "Internal server error"
         });
     }
 });
