@@ -1,6 +1,6 @@
 const express = require('express');
 const fetch = require('node-fetch');
-import { v7 as uuidv7 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -112,7 +112,7 @@ app.post('/api/profiles', async (req, res) => {
             const ageGroup = classifyAgeGroup(agifyData.age);
             const country = nationalizeData.country.reduce((max, c) => c.probability > max.probability ? c : max, nationalizeData.country[0]);
 
-            const id = uuidv7();
+const id = generateUUID();
             const createdAt = new Date().toISOString();
 
             // Store in database
