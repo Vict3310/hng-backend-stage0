@@ -1,6 +1,6 @@
 const express = require('express');
 const fetch = require('node-fetch');
-const { v7: uuidv7 } = require('uuid');
+import { v7 as uuidv7 } from 'uuid';
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = process.env.PORT || 3000;
